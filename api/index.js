@@ -27,7 +27,7 @@ const authenticateToken = (req, res, next) => {
   }
 
   // Di sini Anda bisa mengambil data pengguna dari token
-  req.user = { id: 1 }; // Ganti dengan ID pengguna asli
+  req.user = { id: 1 }; // Ganti dengan ID pengguna asli dari token
   next();
 };
 
@@ -83,10 +83,8 @@ app.post('/login', async (req, res) => {
 });
 
 // -- Endpoints Transaksi (Protected) --
-// Tambahkan middleware 'authenticateToken' untuk melindungi endpoint
 app.get('/transactions', authenticateToken, async (req, res) => {
   try {
-    // Ambil semua transaksi dari tabel 'transactions'
     const result = await pool.query('SELECT * FROM transactions ORDER BY date DESC');
     res.status(200).json(result.rows);
   } catch (err) {
@@ -97,6 +95,12 @@ app.get('/transactions', authenticateToken, async (req, res) => {
 
 app.post('/transactions', authenticateToken, async (req, res) => {
   const { description, amount, is_expense, photo_url } = req.body;
+  
+  // Perbaikan: Validasi untuk memastikan req.body tidak kosong
+  if (!description || !amount || is_expense === undefined) {
+    return res.status(400).json({ message: 'Deskripsi, jumlah, dan jenis transaksi (expense/income) harus diisi.' });
+  }
+
   try {
     const result = await pool.query(
       'INSERT INTO transactions (description, amount, is_expense, photo_url) VALUES ($1, $2, $3, $4) RETURNING *',
@@ -112,6 +116,12 @@ app.post('/transactions', authenticateToken, async (req, res) => {
 app.put('/transactions/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { description, amount, is_expense, photo_url } = req.body;
+  
+  // Validasi: Pastikan data yang diperlukan ada
+  if (!description || !amount || is_expense === undefined) {
+    return res.status(400).json({ message: 'Deskripsi, jumlah, dan jenis transaksi (expense/income) harus diisi.' });
+  }
+
   try {
     const result = await pool.query(
       'UPDATE transactions SET description = $1, amount = $2, is_expense = $3, photo_url = $4 WHERE id = $5 RETURNING *',
