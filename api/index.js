@@ -94,17 +94,17 @@ app.get('/transactions', authenticateToken, async (req, res) => {
 });
 
 app.post('/transactions', authenticateToken, async (req, res) => {
-  const { description, amount, is_expense, photo_url } = req.body;
-  
-  // Perbaikan: Validasi untuk memastikan req.body tidak kosong
+  const { description, amount, is_expense, date, photo_url } = req.body;
+
   if (!description || !amount || is_expense === undefined) {
     return res.status(400).json({ message: 'Deskripsi, jumlah, dan jenis transaksi (expense/income) harus diisi.' });
   }
 
   try {
+    // Perbaikan di sini: Menambahkan operator OR untuk memastikan photo_url bernilai null jika undefined.
     const result = await pool.query(
       'INSERT INTO transactions (description, amount, is_expense, photo_url) VALUES ($1, $2, $3, $4) RETURNING *',
-      [description, amount, is_expense, photo_url]
+      [description, amount, is_expense, photo_url || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -116,8 +116,7 @@ app.post('/transactions', authenticateToken, async (req, res) => {
 app.put('/transactions/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { description, amount, is_expense, photo_url } = req.body;
-  
-  // Validasi: Pastikan data yang diperlukan ada
+
   if (!description || !amount || is_expense === undefined) {
     return res.status(400).json({ message: 'Deskripsi, jumlah, dan jenis transaksi (expense/income) harus diisi.' });
   }
@@ -125,7 +124,7 @@ app.put('/transactions/:id', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       'UPDATE transactions SET description = $1, amount = $2, is_expense = $3, photo_url = $4 WHERE id = $5 RETURNING *',
-      [description, amount, is_expense, photo_url, id]
+      [description, amount, is_expense, photo_url || null, id]
     );
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Transaksi tidak ditemukan.' });
@@ -151,5 +150,4 @@ app.delete('/transactions/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Tambahkan baris ini di bagian akhir file untuk Vercel
 module.exports = app;
