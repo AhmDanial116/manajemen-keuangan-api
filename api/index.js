@@ -45,10 +45,12 @@ app.post('/register', async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
+    // Simpan userId dari request atau buat baru
+    const { userId } = req.body;
     await pool.query('INSERT INTO users (email, password) VALUES ($1, $2)', [email, hashedPassword]);
     res.status(201).json({ message: 'Registrasi berhasil.' });
   } catch (err) {
-    if (err.code === '23505') { // Error code for unique_violation
+    if (err.code === '23505') {
       return res.status(409).json({ message: 'Email sudah terdaftar.' });
     }
     console.error(err);
@@ -75,7 +77,7 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Email atau password salah.' });
     }
 
-    res.status(200).json({ token: 'dummy-token' }); // Ganti dengan token JWT asli
+    res.status(200).json({ token: 'dummy-token' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error saat login.' });
@@ -94,17 +96,17 @@ app.get('/transactions', authenticateToken, async (req, res) => {
 });
 
 app.post('/transactions', authenticateToken, async (req, res) => {
-  const { description, amount, is_expense, date, photo_url } = req.body;
+  // Ambil userId dari request body atau dari token (jika ada)
+  const { description, amount, is_expense, date, photo_url, userId } = req.body;
 
-  if (!description || !amount || is_expense === undefined) {
-    return res.status(400).json({ message: 'Deskripsi, jumlah, dan jenis transaksi (expense/income) harus diisi.' });
+  if (!description || !amount || is_expense === undefined || date === undefined || userId === undefined) {
+    return res.status(400).json({ message: 'Deskripsi, jumlah, jenis transaksi, tanggal, dan userId harus diisi.' });
   }
 
   try {
-    // Perbaikan di sini: Menambahkan operator OR untuk memastikan photo_url bernilai null jika undefined.
     const result = await pool.query(
-      'INSERT INTO transactions (description, amount, is_expense, photo_url) VALUES ($1, $2, $3, $4) RETURNING *',
-      [description, amount, is_expense, photo_url || null]
+      'INSERT INTO transactions (description, amount, is_expense, date, photo_url, "userId") VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [description, amount, is_expense, date, photo_url || null, userId]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -115,16 +117,16 @@ app.post('/transactions', authenticateToken, async (req, res) => {
 
 app.put('/transactions/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { description, amount, is_expense, photo_url } = req.body;
+  const { description, amount, is_expense, date, photo_url, userId } = req.body;
 
-  if (!description || !amount || is_expense === undefined) {
-    return res.status(400).json({ message: 'Deskripsi, jumlah, dan jenis transaksi (expense/income) harus diisi.' });
+  if (!description || !amount || is_expense === undefined || date === undefined || userId === undefined) {
+    return res.status(400).json({ message: 'Deskripsi, jumlah, jenis transaksi, tanggal, dan userId harus diisi.' });
   }
 
   try {
     const result = await pool.query(
-      'UPDATE transactions SET description = $1, amount = $2, is_expense = $3, photo_url = $4 WHERE id = $5 RETURNING *',
-      [description, amount, is_expense, photo_url || null, id]
+      'UPDATE transactions SET description = $1, amount = $2, is_expense = $3, date = $4, photo_url = $5, "userId" = $6 WHERE id = $7 RETURNING *',
+      [description, amount, is_expense, date, photo_url || null, userId, id]
     );
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Transaksi tidak ditemukan.' });
